@@ -1,0 +1,3 @@
+opencv-python==4.5.5.62
+PyQt5==5.13.2
+quamash==0.6.1
