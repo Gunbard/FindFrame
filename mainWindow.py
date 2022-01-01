@@ -37,7 +37,7 @@ class Ui_MainWindow(object):
         self.imageInput.setFrameShape(QtWidgets.QFrame.Panel)
         self.imageInput.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.imageInput.setText("")
-        self.imageInput.setScaledContents(True)
+        self.imageInput.setScaledContents(False)
         self.imageInput.setObjectName("imageInput")
         self.label_2 = QtWidgets.QLabel(self.centralwidget)
         self.label_2.setGeometry(QtCore.QRect(10, 40, 71, 21))
@@ -68,7 +68,7 @@ class Ui_MainWindow(object):
         self.imageVideoFrame.setFrameShape(QtWidgets.QFrame.Panel)
         self.imageVideoFrame.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.imageVideoFrame.setText("")
-        self.imageVideoFrame.setScaledContents(True)
+        self.imageVideoFrame.setScaledContents(False)
         self.imageVideoFrame.setObjectName("imageVideoFrame")
         MainWindow.setCentralWidget(self.centralwidget)
 

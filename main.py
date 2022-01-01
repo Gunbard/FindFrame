@@ -37,7 +37,11 @@ def open_video_path():
 
     height, width, channel = rgbImage.shape
     qImg = QImage(rgbImage.data, width, height, QImage.Format_RGB888)
-    ui.imageVideoFrame.setPixmap(QPixmap(qImg))
+    aspectFitPixmap = QPixmap(qImg).scaled(ui.imageVideoFrame.width(), \
+                                           ui.imageVideoFrame.height(), \
+                                           QtCore.Qt.KeepAspectRatio, \
+                                           QtCore.Qt.FastTransformation)
+    ui.imageVideoFrame.setPixmap(aspectFitPixmap)
     time = video.get(cv2.CAP_PROP_POS_MSEC)
     ui.textLog.append("Time at frame 10: {}".format(time))
 
@@ -47,7 +51,11 @@ def analyze_image(image):
     height, width = parsed_image.shape
     bytesPerLine = 1 * width
     qImg = QImage(parsed_image.data, width, height, bytesPerLine, QImage.Format_Grayscale8)
-    ui.imageInput.setPixmap(QPixmap(qImg))
+    aspectFitPixmap = QPixmap(qImg).scaled(ui.imageVideoFrame.width(), \
+                                        ui.imageVideoFrame.height(), \
+                                        QtCore.Qt.KeepAspectRatio, \
+                                        QtCore.Qt.FastTransformation)
+    ui.imageInput.setPixmap(QPixmap(aspectFitPixmap))
     ui.textLog.append('Parsed input image.')
     
     orb = cv2.ORB_create()
