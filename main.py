@@ -15,7 +15,7 @@ class ResultsColumns(Enum):
     TIMESTAMP = 0
     THUMBNAIL = 1
 
-match_threshold = 80 # Percent
+match_threshold = 40 # Percent of matching descriptors
 
 def millisToTime(ms):
     x = ms / 1000
@@ -27,7 +27,10 @@ def millisToTime(ms):
     return "{}:{}:{}".format(str(hours).zfill(2), str(minutes).zfill(2), str(seconds).zfill(2))
 
 def open_image_path():
-    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Image", os.getcwd(), \
+    working_dir = ui.fieldInputImage.text()
+    if len(working_dir) == 0 or not os.path.exists(working_dir):
+        working_dir = os.getcwd()
+    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Image", working_dir, \
         "Images (*.png *.jpg);;idgaf (*.*)")
     if not path[0]:
         print("No image selected!")
@@ -36,7 +39,10 @@ def open_image_path():
     analyze_image(path[0])
 
 def open_video_path():
-    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Video", os.getcwd(), \
+    working_dir = ui.fieldVideo.text()
+    if len(working_dir) == 0 or not os.path.exists(working_dir):
+        working_dir = os.getcwd()
+    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Video", working_dir, \
         "Videos (*.mp4 *.mkv *.webm);;idgaf (*.*)")
     if not path[0]:
         print("No video selected!")
@@ -54,8 +60,6 @@ def analyze_image(image):
                                         QtCore.Qt.KeepAspectRatio, \
                                         QtCore.Qt.FastTransformation)
     ui.imageInput.setPixmap(aspectFitPixmap)
-    #results_ui.resultsTable.setRowCount(results_ui.resultsTable.rowCount() + 1)
-    #results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, 0, QTableWidgetItem('ass'))
 
 async def scan_video():
     log('Starting processing...')
@@ -68,7 +72,7 @@ async def scan_video():
 
     # Get frame count
     total_frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
-    log("Total frames: {}".format(total_frames))
+    log("Total frames: {}".format(int(total_frames)))
 
     ui.progressBar.setTextVisible(True)
     ui.progressBar.setValue(0)
@@ -85,7 +89,7 @@ async def scan_video():
     keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, source_frame, None)
     brute_force_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 
-    print('Descriptor count for source frame: {}'.format(len(descriptors)))
+    log('Descriptor count for source frame: {}'.format(len(descriptors)))
 
     # Clear out results table
     results_ui.resultsTable.setRowCount(0)
@@ -117,6 +121,7 @@ async def scan_video():
                     timestamp_item.setTextAlignment(QtCore.Qt.AlignCenter)
                     results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, 0, timestamp_item)
                     results_ui.resultsTable.setCellWidget(results_ui.resultsTable.rowCount() - 1, 1, thumbnail_label)
+                    log('Possible match at {}'.format(converted_timestamp))
         else:
             set_processing_mode(False)
             log('Processing complete.')
@@ -157,14 +162,13 @@ def process_frame(scaledWidth, scaledHeight, orb, brute_force_matcher, source_de
     keypoints, descriptors = orb.detectAndCompute(image, None)
 
     if descriptors is None: # This is absolutely idiotic syntax
-        # Discard frame with no descriptors
-        print('No descriptors')
+        # Discard frame with no descriptors (this can be blank or corrupt frames)
         return None, timestamp, True
 
     matches = brute_force_matcher.match(source_descriptors, descriptors)
     print('Matches for frame {}: {}'.format(frame_number, len(matches)))
 
-    if (len(source_descriptors) - len(matches)) < len(source_descriptors) * ((100 - match_threshold) / 100):
+    if len(matches) > (len(source_descriptors) * (match_threshold / 100)):
         # Likely match, so get timestamp
         timestamp = video.get(cv2.CAP_PROP_POS_MSEC)
 
@@ -201,9 +205,9 @@ def set_processing_mode(processing):
     ui.sliderMatchThresh.setEnabled(not processing)
 
 def match_thresh_changed():
+    global match_threshold
     match_threshold = ui.sliderMatchThresh.value()
     ui.labelMatchThresh.setText("{}%".format(match_threshold))
-    return
 
 def log(message):
     ui.textLog.append("[{}] {}".format(datetime.now().strftime("%H:%M:%S.%f"), message))
