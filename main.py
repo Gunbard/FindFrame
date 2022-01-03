@@ -1,4 +1,4 @@
-import cv2, json, os, subprocess, asyncio, qasync, sys
+import cv2, json, math, os, subprocess, asyncio, qasync, sys
 from datetime import datetime
 from enum import Enum
 from mainWindow import Ui_MainWindow
@@ -9,8 +9,19 @@ APP_TITLE = 'FindFrame'
 VERSION = '0.0.1'
 WINDOW_TITLE = "{} {}".format(APP_TITLE, VERSION)
 
+MATCH_THRESHOLD = 0.2 # Percent
+
 # Max number of frames to process at a time
 MAX_BATCH_SIZE = 3
+
+def millisToTime(ms):
+    x = ms / 1000
+    seconds = round(x % 60, 2)
+    x /= 60
+    minutes = math.floor(x % 60)
+    x /= 60
+    hours = math.floor(x % 24)
+    return "{}:{}:{}".format(str(hours).zfill(2), str(minutes).zfill(2), str(seconds).zfill(2))
 
 def open_image_path():
     path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Image", os.getcwd(), "Images (*.png *.jpg);;idgaf (*.*)")
@@ -18,7 +29,7 @@ def open_image_path():
         print("No image selected!")
         return
     ui.fieldInputImage.setText(os.path.normpath(path[0]))
-    asyncio.ensure_future(analyze_image(path[0]))
+    analyze_image(path[0])
 
 def open_video_path():
     path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Video", os.getcwd(), "Videos (*.mp4 *.mkv *.webm);;idgaf (*.*)")
@@ -27,7 +38,7 @@ def open_video_path():
         return
     ui.fieldVideo.setText(os.path.normpath(path[0]))
 
-async def analyze_image(image):
+def analyze_image(image):
     parsed_image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
     
     height, width = parsed_image.shape
@@ -38,9 +49,9 @@ async def analyze_image(image):
                                         QtCore.Qt.KeepAspectRatio, \
                                         QtCore.Qt.FastTransformation)
     ui.imageInput.setPixmap(QPixmap(aspectFitPixmap))
-    
-    orb = cv2.ORB_create()
-    keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, parsed_image, None)
+
+    #orb = cv2.ORB_create()
+    #keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, parsed_image, None)
     #brute_force_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     #matches = brute_force_matcher.match(source_descriptors, target_descriptors)
 
@@ -64,18 +75,39 @@ async def scan_video():
     frameWidth = ui.imageVideoFrame.width()
     frameHeight = ui.imageVideoFrame.height()
 
-    #task = asyncio.ensure_future(process_frame(frameWidth, frameHeight, video, asyncio_semaphore))
-    #task.add_done_callback(frame_processing_complete)
+    # Only need to get source image and generate descriptors once
+    source_frame = cv2.imread(ui.fieldInputImage.text(), cv2.IMREAD_GRAYSCALE)
     
+    log('Generating source image descriptors...')
+    orb = cv2.ORB_create()
+    keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, source_frame, None)
+    brute_force_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
+    print('Descriptor count for source frame: {}'.format(len(descriptors)))
+
+    log('Beginning match search...')
+    candidate_frames = []
     while video.isOpened():
-        result = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, video)
-        if result:
+        result, timestamp, bad_frame = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, orb, brute_force_matcher, descriptors, video)
+        if bad_frame:
+            progress = ui.progressBar.value()
+            ui.progressBar.setValue(progress + 1)
+        elif result:
             ui.imageVideoFrame.setPixmap(result)
             progress = ui.progressBar.value()
             ui.progressBar.setValue(progress + 1)
+            if timestamp > -1:
+                print(timestamp)
+                candidate_frames.append(timestamp)
         else:
             set_processing_mode(False)
             log('Processing complete.')
+            #print(candidate_frames)
+            if len(candidate_frames) > 0:
+                candidate_frames = map(millisToTime, candidate_frames)
+                log('Found likely matches at: {}'.format(list(candidate_frames)))
+            else:
+                log('Did not find any matches!')
             ui.progressBar.setValue(ui.progressBar.maximum())
             break
     #time = video.get(cv2.CAP_PROP_POS_MSEC)
@@ -83,25 +115,48 @@ async def scan_video():
 
 def frame_processing_complete(status):
     print(status)
-    #set_processing_mode(False)
-    #log('Finished processing.')
-    #ui.imageVideoFrame.setPixmap(aspectFitPixmap)
-    #progress = ui.progressBar.value()
-    #ui.progressBar.setValue(progress + 1)
-
-def process_frame(scaledWidth, scaledHeight, video):
+ 
+def process_frame(scaledWidth, scaledHeight, orb, brute_force_matcher, source_descriptors, video):
     #video.set(cv2.CAP_PROP_POS_FRAMES, 10) # Seek to frame 10
+    timestamp = -1
     success, frame = video.read()
     if not success:
-        return None
-    rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        return None, timestamp, False
+    
+    if not frame.any():
+        print('Bad frame')
+        return None, timestamp, True
 
-    height, width, channel = rgbImage.shape
-    qImg = QImage(rgbImage.data, width, height, QImage.Format_RGB888)
+    frame_number = video.get(cv2.CAP_PROP_POS_FRAMES)
+    
+    #rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    height, width = image.shape
+    if height <= 0 or width <= 0:
+        # Discard bad frame
+        print('Bad frame')
+        return None, timestamp, True
+
+    # Generate frame desciptors
+    keypoints, descriptors = orb.detectAndCompute(image, None)
+
+    if descriptors is None: # This is absolutely idiotic syntax
+        # Discard frame with no descriptors
+        print('No descriptors')
+        return None, timestamp, True
+
+    matches = brute_force_matcher.match(source_descriptors, descriptors)
+    print('Matches for frame {}: {}'.format(frame_number, len(matches)))
+
+    if (len(source_descriptors) - len(matches)) < len(source_descriptors) * MATCH_THRESHOLD:
+        # Likely match, so get timestamp
+        timestamp = video.get(cv2.CAP_PROP_POS_MSEC)
+
+    qImg = QImage(image.data, width, height, QImage.Format_Grayscale8)
     return QPixmap(qImg).scaled(scaledWidth, \
                                         scaledHeight, \
                                         QtCore.Qt.KeepAspectRatio, \
-                                        QtCore.Qt.FastTransformation)
+                                        QtCore.Qt.FastTransformation), timestamp, False
 
 def start_processing():
     if not ui.fieldInputImage.text() or not ui.fieldVideo.text():
