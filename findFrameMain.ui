@@ -259,6 +259,19 @@
      <string>0%</string>
     </property>
    </widget>
+   <widget class="QPushButton" name="testbutton">
+    <property name="geometry">
+     <rect>
+      <x>470</x>
+      <y>70</y>
+      <width>31</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>!</string>
+    </property>
+   </widget>
   </widget>
  </widget>
  <resources/>

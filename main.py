@@ -2,15 +2,18 @@ import cv2, json, math, os, subprocess, asyncio, qasync, sys
 from datetime import datetime
 from enum import Enum
 from mainWindow import Ui_MainWindow
+from resultsWindow import Ui_ResultsWindow
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtGui import QImage, QPixmap
+from PyQt5.QtWidgets import QLabel, QTableWidgetItem
 
 APP_TITLE = 'FindFrame'
 VERSION = '0.0.1'
 WINDOW_TITLE = "{} {}".format(APP_TITLE, VERSION)
 
-# Max number of frames to process at a time
-MAX_BATCH_SIZE = 3
+class ResultsColumns(Enum):
+    TIMESTAMP = 0
+    THUMBNAIL = 1
 
 match_threshold = 80 # Percent
 
@@ -50,12 +53,9 @@ def analyze_image(image):
                                         ui.imageInput.height(), \
                                         QtCore.Qt.KeepAspectRatio, \
                                         QtCore.Qt.FastTransformation)
-    ui.imageInput.setPixmap(QPixmap(aspectFitPixmap))
-
-    #orb = cv2.ORB_create()
-    #keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, parsed_image, None)
-    #brute_force_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    #matches = brute_force_matcher.match(source_descriptors, target_descriptors)
+    ui.imageInput.setPixmap(aspectFitPixmap)
+    #results_ui.resultsTable.setRowCount(results_ui.resultsTable.rowCount() + 1)
+    #results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, 0, QTableWidgetItem('ass'))
 
 async def scan_video():
     log('Starting processing...')
@@ -87,6 +87,9 @@ async def scan_video():
 
     print('Descriptor count for source frame: {}'.format(len(descriptors)))
 
+    # Clear out results table
+    results_ui.resultsTable.setRowCount(0)
+
     log('Beginning match search...')
     candidate_frames = set()
     while video.isOpened():
@@ -101,13 +104,26 @@ async def scan_video():
             ui.progressBar.setValue(progress + 1)
             if timestamp > -1:
                 print(timestamp)
-                candidate_frames.add(millisToTime(timestamp))
+                converted_timestamp = millisToTime(timestamp)
+                candidate_frames_prev_size = len(candidate_frames)
+                candidate_frames.add(converted_timestamp)
+                # New timestamp, so include in results table
+                if len(candidate_frames) > candidate_frames_prev_size:
+                    results_ui.resultsTable.setRowCount(results_ui.resultsTable.rowCount() + 1)
+                    thumbnail_label = QLabel()
+                    thumbnail_label.setAlignment(QtCore.Qt.AlignCenter)
+                    thumbnail_label.setPixmap(result)
+                    timestamp_item = QTableWidgetItem(converted_timestamp)
+                    timestamp_item.setTextAlignment(QtCore.Qt.AlignCenter)
+                    results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, 0, timestamp_item)
+                    results_ui.resultsTable.setCellWidget(results_ui.resultsTable.rowCount() - 1, 1, thumbnail_label)
         else:
             set_processing_mode(False)
             log('Processing complete.')
             if len(candidate_frames) > 0:
                 candidate_frames = sorted(candidate_frames)
                 log('Found likely matches at: {}'.format(list(candidate_frames)))
+                ResultsWindow.exec_()
             else:
                 log('Did not find any matches!')
             ui.progressBar.setValue(ui.progressBar.maximum())
@@ -180,6 +196,9 @@ def set_processing_mode(processing):
         ui.btnStartScan.setText("Scan Video")
 
     ui.progressBar.setTextVisible(processing)
+    ui.btnOpenInputImage.setEnabled(not processing)
+    ui.btnOpenVideo.setEnabled(not processing)
+    ui.sliderMatchThresh.setEnabled(not processing)
 
 def match_thresh_changed():
     match_threshold = ui.sliderMatchThresh.value()
@@ -194,12 +213,18 @@ app = QtWidgets.QApplication(sys.argv)
 loop = qasync.QEventLoop(app)
 asyncio.set_event_loop(loop)
 asyncio.events._set_running_loop(loop)
-asyncio_semaphore = asyncio.Semaphore(MAX_BATCH_SIZE)
 
 MainWindow = QtWidgets.QMainWindow()
 ui = Ui_MainWindow()
 ui.setupUi(MainWindow)
 MainWindow.setWindowFlags(QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowMinimizeButtonHint)
+
+ResultsWindow = QtWidgets.QDialog(MainWindow)
+results_ui = Ui_ResultsWindow()
+results_ui.setupUi(ResultsWindow)
+
+results_ui.resultsTable.setHorizontalHeaderLabels(['Timestamp', 'Thumbnail'])
+
 
 # Defaults
 ui.sliderMatchThresh.setSliderPosition(match_threshold)
@@ -210,6 +235,8 @@ ui.btnOpenInputImage.clicked.connect(open_image_path)
 ui.btnOpenVideo.clicked.connect(open_video_path)
 ui.btnStartScan.clicked.connect(start_processing)
 ui.sliderMatchThresh.valueChanged.connect(match_thresh_changed)
+
+ui.testbutton.clicked.connect(lambda: ResultsWindow.exec_())
 
 MainWindow.setWindowTitle(WINDOW_TITLE)
 MainWindow.show()
