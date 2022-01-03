@@ -37,20 +37,23 @@
      <rect>
       <x>10</x>
       <y>10</y>
-      <width>71</width>
+      <width>91</width>
       <height>21</height>
      </rect>
     </property>
     <property name="text">
      <string>Input image:</string>
     </property>
+    <property name="buddy">
+     <cstring>fieldInputImage</cstring>
+    </property>
    </widget>
    <widget class="QLineEdit" name="fieldInputImage">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>100</x>
       <y>10</y>
-      <width>361</width>
+      <width>351</width>
       <height>20</height>
      </rect>
     </property>
@@ -95,20 +98,23 @@
      <rect>
       <x>10</x>
       <y>40</y>
-      <width>71</width>
+      <width>91</width>
       <height>21</height>
      </rect>
     </property>
     <property name="text">
      <string>Video:</string>
     </property>
+    <property name="buddy">
+     <cstring>fieldVideo</cstring>
+    </property>
    </widget>
    <widget class="QLineEdit" name="fieldVideo">
     <property name="geometry">
      <rect>
-      <x>90</x>
+      <x>100</x>
       <y>40</y>
-      <width>361</width>
+      <width>351</width>
       <height>20</height>
      </rect>
     </property>
@@ -148,7 +154,7 @@
    <widget class="QPushButton" name="btnStartScan">
     <property name="geometry">
      <rect>
-      <x>180</x>
+      <x>300</x>
       <y>70</y>
       <width>161</width>
       <height>31</height>
@@ -197,6 +203,60 @@
     </property>
     <property name="scaledContents">
      <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QSlider" name="sliderMatchThresh">
+    <property name="geometry">
+     <rect>
+      <x>100</x>
+      <y>70</y>
+      <width>141</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="minimum">
+     <number>1</number>
+    </property>
+    <property name="maximum">
+     <number>99</number>
+    </property>
+    <property name="sliderPosition">
+     <number>10</number>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Horizontal</enum>
+    </property>
+    <property name="invertedAppearance">
+     <bool>false</bool>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_3">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>70</y>
+      <width>91</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Match threshold:</string>
+    </property>
+    <property name="buddy">
+     <cstring>sliderMatchThresh</cstring>
+    </property>
+   </widget>
+   <widget class="QLabel" name="labelMatchThresh">
+    <property name="geometry">
+     <rect>
+      <x>250</x>
+      <y>70</y>
+      <width>31</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>0%</string>
     </property>
    </widget>
   </widget>

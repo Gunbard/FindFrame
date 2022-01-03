@@ -9,10 +9,10 @@ APP_TITLE = 'FindFrame'
 VERSION = '0.0.1'
 WINDOW_TITLE = "{} {}".format(APP_TITLE, VERSION)
 
-MATCH_THRESHOLD = 0.2 # Percent
-
 # Max number of frames to process at a time
 MAX_BATCH_SIZE = 3
+
+match_threshold = 80 # Percent
 
 def millisToTime(ms):
     x = ms / 1000
@@ -24,7 +24,8 @@ def millisToTime(ms):
     return "{}:{}:{}".format(str(hours).zfill(2), str(minutes).zfill(2), str(seconds).zfill(2))
 
 def open_image_path():
-    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Image", os.getcwd(), "Images (*.png *.jpg);;idgaf (*.*)")
+    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Image", os.getcwd(), \
+        "Images (*.png *.jpg);;idgaf (*.*)")
     if not path[0]:
         print("No image selected!")
         return
@@ -32,7 +33,8 @@ def open_image_path():
     analyze_image(path[0])
 
 def open_video_path():
-    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Video", os.getcwd(), "Videos (*.mp4 *.mkv *.webm);;idgaf (*.*)")
+    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Video", os.getcwd(), \
+        "Videos (*.mp4 *.mkv *.webm);;idgaf (*.*)")
     if not path[0]:
         print("No video selected!")
         return
@@ -88,7 +90,8 @@ async def scan_video():
     log('Beginning match search...')
     candidate_frames = set()
     while video.isOpened():
-        result, timestamp, bad_frame = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, orb, brute_force_matcher, descriptors, video)
+        result, timestamp, bad_frame = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, \
+            orb, brute_force_matcher, descriptors, video)
         if bad_frame:
             progress = ui.progressBar.value()
             ui.progressBar.setValue(progress + 1)
@@ -145,11 +148,11 @@ def process_frame(scaledWidth, scaledHeight, orb, brute_force_matcher, source_de
     matches = brute_force_matcher.match(source_descriptors, descriptors)
     print('Matches for frame {}: {}'.format(frame_number, len(matches)))
 
-    if (len(source_descriptors) - len(matches)) < len(source_descriptors) * MATCH_THRESHOLD:
+    if (len(source_descriptors) - len(matches)) < len(source_descriptors) * ((100 - match_threshold) / 100):
         # Likely match, so get timestamp
         timestamp = video.get(cv2.CAP_PROP_POS_MSEC)
 
-    qImg = QImage(image.data, width, height, QImage.Format_Grayscale8)
+    qImg = QImage(image.data, width, height, width, QImage.Format_Grayscale8)
     return QPixmap(qImg).scaled(scaledWidth, \
                                         scaledHeight, \
                                         QtCore.Qt.KeepAspectRatio, \
@@ -178,6 +181,11 @@ def set_processing_mode(processing):
 
     ui.progressBar.setTextVisible(processing)
 
+def match_thresh_changed():
+    match_threshold = ui.sliderMatchThresh.value()
+    ui.labelMatchThresh.setText("{}%".format(match_threshold))
+    return
+
 def log(message):
     ui.textLog.append("[{}] {}".format(datetime.now().strftime("%H:%M:%S.%f"), message))
 
@@ -193,10 +201,15 @@ ui = Ui_MainWindow()
 ui.setupUi(MainWindow)
 MainWindow.setWindowFlags(QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowMinimizeButtonHint)
 
+# Defaults
+ui.sliderMatchThresh.setSliderPosition(match_threshold)
+ui.labelMatchThresh.setText("{}%".format(match_threshold))
+
 # EVENTS
 ui.btnOpenInputImage.clicked.connect(open_image_path)
 ui.btnOpenVideo.clicked.connect(open_video_path)
 ui.btnStartScan.clicked.connect(start_processing)
+ui.sliderMatchThresh.valueChanged.connect(match_thresh_changed)
 
 MainWindow.setWindowTitle(WINDOW_TITLE)
 MainWindow.show()
