@@ -16,7 +16,7 @@ MAX_BATCH_SIZE = 3
 
 def millisToTime(ms):
     x = ms / 1000
-    seconds = round(x % 60, 2)
+    seconds = round(x % 60)
     x /= 60
     minutes = math.floor(x % 60)
     x /= 60
@@ -86,7 +86,7 @@ async def scan_video():
     print('Descriptor count for source frame: {}'.format(len(descriptors)))
 
     log('Beginning match search...')
-    candidate_frames = []
+    candidate_frames = set()
     while video.isOpened():
         result, timestamp, bad_frame = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, orb, brute_force_matcher, descriptors, video)
         if bad_frame:
@@ -98,20 +98,17 @@ async def scan_video():
             ui.progressBar.setValue(progress + 1)
             if timestamp > -1:
                 print(timestamp)
-                candidate_frames.append(timestamp)
+                candidate_frames.add(millisToTime(timestamp))
         else:
             set_processing_mode(False)
             log('Processing complete.')
-            #print(candidate_frames)
             if len(candidate_frames) > 0:
-                candidate_frames = map(millisToTime, candidate_frames)
+                candidate_frames = sorted(candidate_frames)
                 log('Found likely matches at: {}'.format(list(candidate_frames)))
             else:
                 log('Did not find any matches!')
             ui.progressBar.setValue(ui.progressBar.maximum())
             break
-    #time = video.get(cv2.CAP_PROP_POS_MSEC)
-    #log("Time at frame 10: {}".format(time))
 
 def frame_processing_complete(status):
     print(status)
