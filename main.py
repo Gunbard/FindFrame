@@ -13,7 +13,8 @@ WINDOW_TITLE = "{} {}".format(APP_TITLE, VERSION)
 
 class ResultsColumns(Enum):
     TIMESTAMP = 0
-    THUMBNAIL = 1
+    CONFIDENCE = 1
+    THUMBNAIL = 2
 
 match_threshold = 40 # Percent of matching descriptors
 
@@ -97,7 +98,7 @@ async def scan_video():
     log('Beginning match search...')
     candidate_frames = set()
     while video.isOpened():
-        result, timestamp, bad_frame = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, \
+        result, timestamp, bad_frame, matches = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, \
             orb, brute_force_matcher, descriptors, video)
         if bad_frame:
             progress = ui.progressBar.value()
@@ -107,7 +108,7 @@ async def scan_video():
             progress = ui.progressBar.value()
             ui.progressBar.setValue(progress + 1)
             if timestamp > -1:
-                print(timestamp)
+                #print(timestamp)
                 converted_timestamp = millisToTime(timestamp)
                 candidate_frames_prev_size = len(candidate_frames)
                 candidate_frames.add(converted_timestamp)
@@ -119,15 +120,21 @@ async def scan_video():
                     thumbnail_label.setPixmap(result)
                     timestamp_item = QTableWidgetItem(converted_timestamp)
                     timestamp_item.setTextAlignment(QtCore.Qt.AlignCenter)
-                    results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, 0, timestamp_item)
-                    results_ui.resultsTable.setCellWidget(results_ui.resultsTable.rowCount() - 1, 1, thumbnail_label)
+                    confidence_item = QTableWidgetItem('{:.1f}%'.format(matches))
+                    confidence_item.setTextAlignment(QtCore.Qt.AlignCenter)
+                    results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
+                        ResultsColumns.TIMESTAMP.value, timestamp_item)
+                    results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
+                        ResultsColumns.CONFIDENCE.value, confidence_item)
+                    results_ui.resultsTable.setCellWidget(results_ui.resultsTable.rowCount() - 1, \
+                        ResultsColumns.THUMBNAIL.value, thumbnail_label)
                     log('Possible match at {}'.format(converted_timestamp))
         else:
             set_processing_mode(False)
             log('Processing complete.')
             if len(candidate_frames) > 0:
                 candidate_frames = sorted(candidate_frames)
-                log('Found likely matches at: {}'.format(list(candidate_frames)))
+                log('Found potential matches at: {}'.format(list(candidate_frames)))
                 ResultsWindow.exec_()
             else:
                 log('Did not find any matches!')
@@ -142,11 +149,11 @@ def process_frame(scaledWidth, scaledHeight, orb, brute_force_matcher, source_de
     timestamp = -1
     success, frame = video.read()
     if not success:
-        return None, timestamp, False
+        return None, timestamp, False, 0
     
     if not frame.any():
         print('Bad frame')
-        return None, timestamp, True
+        return None, timestamp, True, 0
 
     frame_number = video.get(cv2.CAP_PROP_POS_FRAMES)
     
@@ -156,14 +163,14 @@ def process_frame(scaledWidth, scaledHeight, orb, brute_force_matcher, source_de
     if height <= 0 or width <= 0:
         # Discard bad frame
         print('Bad frame')
-        return None, timestamp, True
+        return None, timestamp, True, 0
 
     # Generate frame desciptors
     keypoints, descriptors = orb.detectAndCompute(image, None)
 
     if descriptors is None: # This is absolutely idiotic syntax
         # Discard frame with no descriptors (this can be blank or corrupt frames)
-        return None, timestamp, True
+        return None, timestamp, True, 0
 
     matches = brute_force_matcher.match(source_descriptors, descriptors)
     print('Matches for frame {}: {}'.format(frame_number, len(matches)))
@@ -174,9 +181,12 @@ def process_frame(scaledWidth, scaledHeight, orb, brute_force_matcher, source_de
 
     qImg = QImage(image.data, width, height, width, QImage.Format_Grayscale8)
     return QPixmap(qImg).scaled(scaledWidth, \
-                                        scaledHeight, \
-                                        QtCore.Qt.KeepAspectRatio, \
-                                        QtCore.Qt.FastTransformation), timestamp, False
+                                scaledHeight, \
+                                QtCore.Qt.KeepAspectRatio, \
+                                QtCore.Qt.FastTransformation), \
+                                timestamp, \
+                                False, \
+                                (len(matches) / len(source_descriptors)) * 100
 
 def start_processing():
     if not ui.fieldInputImage.text() or not ui.fieldVideo.text():
@@ -227,8 +237,7 @@ ResultsWindow = QtWidgets.QDialog(MainWindow)
 results_ui = Ui_ResultsWindow()
 results_ui.setupUi(ResultsWindow)
 
-results_ui.resultsTable.setHorizontalHeaderLabels(['Timestamp', 'Thumbnail'])
-
+results_ui.resultsTable.setHorizontalHeaderLabels(['Timestamp', 'Confidence', 'Thumbnail'])
 
 # Defaults
 ui.sliderMatchThresh.setSliderPosition(match_threshold)

@@ -27,7 +27,7 @@ class Ui_ResultsWindow(object):
         self.resultsTable.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.resultsTable.setCornerButtonEnabled(False)
         self.resultsTable.setRowCount(0)
-        self.resultsTable.setColumnCount(2)
+        self.resultsTable.setColumnCount(3)
         self.resultsTable.setObjectName("resultsTable")
         self.resultsTable.horizontalHeader().setVisible(True)
         self.resultsTable.horizontalHeader().setStretchLastSection(True)

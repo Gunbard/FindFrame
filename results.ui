@@ -38,7 +38,7 @@
       <number>0</number>
      </property>
      <property name="columnCount">
-      <number>2</number>
+      <number>3</number>
      </property>
      <attribute name="horizontalHeaderVisible">
       <bool>true</bool>
@@ -55,6 +55,7 @@
      <attribute name="verticalHeaderStretchLastSection">
       <bool>true</bool>
      </attribute>
+     <column/>
      <column/>
      <column/>
     </widget>
