@@ -53,14 +53,20 @@ def open_video_path():
 def analyze_image(image):
     parsed_image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
     
-    height, width = parsed_image.shape
-    bytesPerLine = 1 * width
-    qImg = QImage(parsed_image.data, width, height, bytesPerLine, QImage.Format_Grayscale8)
+    orb = cv2.ORB_create(nfeatures=1000)
+    keypoints, descriptors = orb.detectAndCompute(parsed_image, None)
+
+    img = cv2.drawKeypoints(parsed_image, keypoints, None, color=(0,255,255), flags=0)
+
+    height, width, channel = img.shape
+    bytesPerLine = 3 * width
+    qImg = QImage(img.data, width, height, bytesPerLine, QImage.Format_RGB888)
     aspectFitPixmap = QPixmap(qImg).scaled(ui.imageInput.width(), \
                                         ui.imageInput.height(), \
                                         QtCore.Qt.KeepAspectRatio, \
                                         QtCore.Qt.FastTransformation)
     ui.imageInput.setPixmap(aspectFitPixmap)
+    
 
 async def scan_video():
     log('Starting processing...')
@@ -86,11 +92,11 @@ async def scan_video():
     source_frame = cv2.imread(ui.fieldInputImage.text(), cv2.IMREAD_GRAYSCALE)
     
     log('Generating source image descriptors...')
-    orb = cv2.ORB_create()
+    orb = cv2.ORB_create(nfeatures=1000)
     keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, source_frame, None)
     brute_force_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
 
-    log('Descriptor count for source frame: {}'.format(len(descriptors)))
+    #log('Descriptor count for source frame: {}'.format(len(descriptors)))
 
     # Clear out results table
     results_ui.resultsTable.setRowCount(0)
@@ -99,7 +105,7 @@ async def scan_video():
     candidate_frames = set()
     while video.isOpened():
         result, timestamp, bad_frame, matches = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, \
-            orb, brute_force_matcher, descriptors, video)
+            brute_force_matcher, descriptors, video)
         if bad_frame:
             progress = ui.progressBar.value()
             ui.progressBar.setValue(progress + 1)
@@ -144,7 +150,7 @@ async def scan_video():
 def frame_processing_complete(status):
     print(status)
  
-def process_frame(scaledWidth, scaledHeight, orb, brute_force_matcher, source_descriptors, video):
+def process_frame(scaledWidth, scaledHeight, brute_force_matcher, source_descriptors, video):
     #video.set(cv2.CAP_PROP_POS_FRAMES, 10) # Seek to frame 10
     timestamp = -1
     success, frame = video.read()
@@ -166,6 +172,7 @@ def process_frame(scaledWidth, scaledHeight, orb, brute_force_matcher, source_de
         return None, timestamp, True, 0
 
     # Generate frame desciptors
+    orb = cv2.ORB_create(nfeatures=1000)
     keypoints, descriptors = orb.detectAndCompute(image, None)
 
     if descriptors is None: # This is absolutely idiotic syntax
@@ -176,7 +183,7 @@ def process_frame(scaledWidth, scaledHeight, orb, brute_force_matcher, source_de
     print('Matches for frame {}: {}'.format(frame_number, len(matches)))
 
     if len(matches) > (len(source_descriptors) * (match_threshold / 100)):
-        # Likely match, so get timestamp
+        # Possible match, so get timestamp
         timestamp = video.get(cv2.CAP_PROP_POS_MSEC)
 
     qImg = QImage(image.data, width, height, width, QImage.Format_Grayscale8)
