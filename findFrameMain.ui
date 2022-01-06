@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>512</width>
-    <height>320</height>
+    <height>360</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -19,13 +19,13 @@
   <property name="minimumSize">
    <size>
     <width>512</width>
-    <height>320</height>
+    <height>360</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>512</width>
-    <height>320</height>
+    <height>360</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -75,7 +75,7 @@
     <property name="geometry">
      <rect>
       <x>250</x>
-      <y>190</y>
+      <y>160</y>
       <width>121</width>
       <height>91</height>
      </rect>
@@ -138,7 +138,7 @@
       <x>10</x>
       <y>100</y>
       <width>231</width>
-      <height>181</height>
+      <height>191</height>
      </rect>
     </property>
     <property name="frameShape">
@@ -154,9 +154,9 @@
    <widget class="QPushButton" name="btnStartScan">
     <property name="geometry">
      <rect>
-      <x>290</x>
+      <x>250</x>
       <y>100</y>
-      <width>161</width>
+      <width>171</width>
       <height>51</height>
      </rect>
     </property>
@@ -168,7 +168,7 @@
     <property name="geometry">
      <rect>
       <x>10</x>
-      <y>290</y>
+      <y>300</y>
       <width>491</width>
       <height>20</height>
      </rect>
@@ -187,7 +187,7 @@
     <property name="geometry">
      <rect>
       <x>380</x>
-      <y>190</y>
+      <y>160</y>
       <width>121</width>
       <height>91</height>
      </rect>
@@ -259,23 +259,23 @@
      <string>0%</string>
     </property>
    </widget>
-   <widget class="QPushButton" name="testbutton">
+   <widget class="QPushButton" name="btnResults">
     <property name="geometry">
      <rect>
-      <x>460</x>
+      <x>430</x>
       <y>100</y>
-      <width>41</width>
-      <height>31</height>
+      <width>71</width>
+      <height>51</height>
      </rect>
     </property>
     <property name="text">
-     <string>!</string>
+     <string>Results</string>
     </property>
    </widget>
    <widget class="QCheckBox" name="checkBoostContrast">
     <property name="geometry">
      <rect>
-      <x>310</x>
+      <x>320</x>
       <y>70</y>
       <width>141</width>
       <height>18</height>
@@ -292,10 +292,16 @@
     <property name="geometry">
      <rect>
       <x>250</x>
-      <y>160</y>
+      <y>260</y>
       <width>251</width>
-      <height>21</height>
+      <height>31</height>
      </rect>
+    </property>
+    <property name="font">
+     <font>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
     </property>
     <property name="frameShape">
      <enum>QFrame::Panel</enum>
@@ -308,6 +314,28 @@
     </property>
     <property name="wordWrap">
      <bool>true</bool>
+    </property>
+   </widget>
+   <widget class="QProgressBar" name="progressBarFiles">
+    <property name="geometry">
+     <rect>
+      <x>10</x>
+      <y>330</y>
+      <width>491</width>
+      <height>20</height>
+     </rect>
+    </property>
+    <property name="value">
+     <number>0</number>
+    </property>
+    <property name="textVisible">
+     <bool>false</bool>
+    </property>
+    <property name="invertedAppearance">
+     <bool>false</bool>
+    </property>
+    <property name="format">
+     <string>%v/%m</string>
     </property>
    </widget>
   </widget>

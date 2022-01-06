@@ -87,7 +87,8 @@ async def scan_video(index, semaphore):
             log("Failed to open {}".format(os.path.basename(path)))
             return
 
-        ui.labelFileProgress.setText('{} ({}/{})'.format(os.path.basename(path), index + 1, len(file_list)))
+        ui.labelFileProgress.setText('File: {}'.format(os.path.basename(path)))
+        ui.progressBarFiles.setValue(index + 1)
 
         # Get frame count
         total_frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
@@ -146,7 +147,7 @@ async def scan_video(index, semaphore):
                         thumbnail_label.setPixmap(result)
                         timestamp_item = QTableWidgetItem(converted_timestamp)
                         timestamp_item.setTextAlignment(QtCore.Qt.AlignCenter)
-                        confidence_item = QTableWidgetItem('{}/{} ({:.1f}%)'.format(matches, len(descriptors), ((matches/len(descriptors)) * 100)))
+                        confidence_item = QTableWidgetItem('{:.1f}% ({}/{})'.format(((matches/len(descriptors)) * 100), matches, len(descriptors)))
                         confidence_item.setTextAlignment(QtCore.Qt.AlignCenter)
                         
                         results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
@@ -224,7 +225,6 @@ def process_frame(scaledWidth, scaledHeight, matcher, source_descriptors, video,
         if m.distance < MATCH_FILTER_THRESHOLD * n.distance:
             good_matches.append(m)
 
-
     print('Matches for frame {}: {}'.format(int(frame_number), len(good_matches)))
 
     if len(good_matches) > (len(source_descriptors) * (match_threshold / 100)):
@@ -257,6 +257,10 @@ def start_processing():
 
         global file_list
         file_list = ui.fieldVideo.text().split(';')
+
+        ui.progressBarFiles.setValue(0)
+        ui.progressBarFiles.setRange(0, len(file_list))
+
         for index, item in enumerate(file_list):
             task = asyncio.ensure_future(scan_video(index, asyncio_semaphore))
             task.add_done_callback(processing_complete)
@@ -268,13 +272,13 @@ def set_processing_mode(processing):
         ui.btnStartScan.setText("Scan")
 
     ui.progressBar.setTextVisible(processing)
+    ui.progressBarFiles.setTextVisible(processing)
     ui.btnOpenInputImage.setEnabled(not processing)
     ui.btnOpenVideo.setEnabled(not processing)
     ui.sliderMatchThresh.setEnabled(not processing)
     ui.checkBoostContrast.setEnabled(not processing)
 
     ui.labelFileProgress.setText('')
-
 
 def match_thresh_changed():
     global match_threshold
@@ -312,7 +316,7 @@ ui.btnOpenVideo.clicked.connect(open_video_path)
 ui.btnStartScan.clicked.connect(start_processing)
 ui.sliderMatchThresh.valueChanged.connect(match_thresh_changed)
 
-ui.testbutton.clicked.connect(lambda: ResultsWindow.show())
+ui.btnResults.clicked.connect(lambda: ResultsWindow.show())
 
 MainWindow.setWindowTitle(WINDOW_TITLE)
 MainWindow.show()
