@@ -10,6 +10,8 @@ from PyQt5.QtWidgets import QLabel, QTableWidgetItem
 APP_TITLE = 'FindFrame'
 VERSION = '0.0.1'
 WINDOW_TITLE = "{} {}".format(APP_TITLE, VERSION)
+MATCH_FILTER_THRESHOLD = 0.9 # Discard 10% of possible outliers
+ORB_NFEATURES = 1000
 
 class ResultsColumns(Enum):
     TIMESTAMP = 0
@@ -53,7 +55,7 @@ def open_video_path():
 def analyze_image(image):
     parsed_image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
     
-    orb = cv2.ORB_create(nfeatures=1000)
+    orb = cv2.ORB_create(nfeatures=ORB_NFEATURES)
     keypoints, descriptors = orb.detectAndCompute(parsed_image, None)
 
     img = cv2.drawKeypoints(parsed_image, keypoints, None, color=(0,255,255), flags=0)
@@ -92,9 +94,17 @@ async def scan_video():
     source_frame = cv2.imread(ui.fieldInputImage.text(), cv2.IMREAD_GRAYSCALE)
     
     log('Generating source image descriptors...')
-    orb = cv2.ORB_create(nfeatures=1000)
+    orb = cv2.ORB_create(nfeatures=ORB_NFEATURES)
     keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, source_frame, None)
-    brute_force_matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    #matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    FLANN_INDEX_LSH = 6
+    index_params = dict(algorithm = FLANN_INDEX_LSH,
+                    table_number = 6, # 12
+                    key_size = 12,     # 20
+                    multi_probe_level = 1) # 2
+    search_params = dict(checks=50)
+
+    matcher = cv2.FlannBasedMatcher(index_params, search_params)
 
     #log('Descriptor count for source frame: {}'.format(len(descriptors)))
 
@@ -105,7 +115,7 @@ async def scan_video():
     candidate_frames = set()
     while video.isOpened():
         result, timestamp, bad_frame, matches = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, \
-            brute_force_matcher, descriptors, video)
+            matcher, descriptors, video)
         if bad_frame:
             progress = ui.progressBar.value()
             ui.progressBar.setValue(progress + 1)
@@ -126,7 +136,7 @@ async def scan_video():
                     thumbnail_label.setPixmap(result)
                     timestamp_item = QTableWidgetItem(converted_timestamp)
                     timestamp_item.setTextAlignment(QtCore.Qt.AlignCenter)
-                    confidence_item = QTableWidgetItem('{:.1f}%'.format(matches))
+                    confidence_item = QTableWidgetItem('{}/{} ({:.1f}%)'.format(matches, len(descriptors), ((matches/len(descriptors)) * 100)))
                     confidence_item.setTextAlignment(QtCore.Qt.AlignCenter)
                     results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
                         ResultsColumns.TIMESTAMP.value, timestamp_item)
@@ -150,7 +160,7 @@ async def scan_video():
 def frame_processing_complete(status):
     print(status)
  
-def process_frame(scaledWidth, scaledHeight, brute_force_matcher, source_descriptors, video):
+def process_frame(scaledWidth, scaledHeight, matcher, source_descriptors, video):
     #video.set(cv2.CAP_PROP_POS_FRAMES, 10) # Seek to frame 10
     timestamp = -1
     success, frame = video.read()
@@ -164,6 +174,13 @@ def process_frame(scaledWidth, scaledHeight, brute_force_matcher, source_descrip
     frame_number = video.get(cv2.CAP_PROP_POS_FRAMES)
     
     #rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    
+    # Increase contrast
+    contrast = 1.5
+    brightness = 0
+    brightness += int(round(255 * (1 - contrast) / 2))
+    frame = cv2.addWeighted(frame, contrast, frame, 0, brightness)
+
     image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     height, width = image.shape
     if height <= 0 or width <= 0:
@@ -172,17 +189,30 @@ def process_frame(scaledWidth, scaledHeight, brute_force_matcher, source_descrip
         return None, timestamp, True, 0
 
     # Generate frame desciptors
-    orb = cv2.ORB_create(nfeatures=1000)
+    orb = cv2.ORB_create(nfeatures=ORB_NFEATURES)
     keypoints, descriptors = orb.detectAndCompute(image, None)
 
     if descriptors is None: # This is absolutely idiotic syntax
         # Discard frame with no descriptors (this can be blank or corrupt frames)
         return None, timestamp, True, 0
 
-    matches = brute_force_matcher.match(source_descriptors, descriptors)
-    print('Matches for frame {}: {}'.format(frame_number, len(matches)))
+    try:
+        matches = matcher.knnMatch(source_descriptors, descriptors, k=2)
+    except:
+        return None, timestamp, True, 0
 
-    if len(matches) > (len(source_descriptors) * (match_threshold / 100)):
+    good_matches = []
+    for match in matches:
+        if len(match) < 2:
+            continue
+        m, n = match
+        if m.distance < MATCH_FILTER_THRESHOLD * n.distance:
+            good_matches.append(m)
+
+
+    print('Matches for frame {}: {}'.format(int(frame_number), len(good_matches)))
+
+    if len(good_matches) > (len(source_descriptors) * (match_threshold / 100)):
         # Possible match, so get timestamp
         timestamp = video.get(cv2.CAP_PROP_POS_MSEC)
 
@@ -193,7 +223,7 @@ def process_frame(scaledWidth, scaledHeight, brute_force_matcher, source_descrip
                                 QtCore.Qt.FastTransformation), \
                                 timestamp, \
                                 False, \
-                                (len(matches) / len(source_descriptors)) * 100
+                                len(good_matches)
 
 def start_processing():
     if not ui.fieldInputImage.text() or not ui.fieldVideo.text():
