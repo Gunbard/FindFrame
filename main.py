@@ -113,9 +113,10 @@ async def scan_video():
 
     log('Beginning match search...')
     candidate_frames = set()
+    boost_contrast = ui.checkBoostContrast.isChecked()
     while video.isOpened():
         result, timestamp, bad_frame, matches = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, \
-            matcher, descriptors, video)
+            matcher, descriptors, video, boost_contrast)
         if bad_frame:
             progress = ui.progressBar.value()
             ui.progressBar.setValue(progress + 1)
@@ -151,7 +152,8 @@ async def scan_video():
             if len(candidate_frames) > 0:
                 candidate_frames = sorted(candidate_frames)
                 log('Found potential matches at: {}'.format(list(candidate_frames)))
-                ResultsWindow.exec_()
+                if not ResultsWindow.isVisible():
+                    ResultsWindow.exec_()
             else:
                 log('Did not find any matches!')
             ui.progressBar.setValue(ui.progressBar.maximum())
@@ -160,7 +162,7 @@ async def scan_video():
 def frame_processing_complete(status):
     print(status)
  
-def process_frame(scaledWidth, scaledHeight, matcher, source_descriptors, video):
+def process_frame(scaledWidth, scaledHeight, matcher, source_descriptors, video, boost_contrast):
     #video.set(cv2.CAP_PROP_POS_FRAMES, 10) # Seek to frame 10
     timestamp = -1
     success, frame = video.read()
@@ -176,10 +178,11 @@ def process_frame(scaledWidth, scaledHeight, matcher, source_descriptors, video)
     #rgbImage = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     
     # Increase contrast
-    contrast = 1.5
-    brightness = 0
-    brightness += int(round(255 * (1 - contrast) / 2))
-    frame = cv2.addWeighted(frame, contrast, frame, 0, brightness)
+    if boost_contrast:
+        contrast = 1.5
+        brightness = 0
+        brightness += int(round(255 * (1 - contrast) / 2))
+        frame = cv2.addWeighted(frame, contrast, frame, 0, brightness)
 
     image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     height, width = image.shape
@@ -250,6 +253,7 @@ def set_processing_mode(processing):
     ui.btnOpenInputImage.setEnabled(not processing)
     ui.btnOpenVideo.setEnabled(not processing)
     ui.sliderMatchThresh.setEnabled(not processing)
+    ui.checkBoostContrast.setEnabled(not processing)
 
 def match_thresh_changed():
     global match_threshold
