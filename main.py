@@ -1,3 +1,4 @@
+from posixpath import join
 import cv2, json, math, os, subprocess, asyncio, qasync, sys
 from datetime import datetime
 from enum import Enum
@@ -10,15 +11,18 @@ from PyQt5.QtWidgets import QLabel, QTableWidgetItem
 APP_TITLE = 'FindFrame'
 VERSION = '0.0.1'
 WINDOW_TITLE = "{} {}".format(APP_TITLE, VERSION)
-MATCH_FILTER_THRESHOLD = 0.9 # Discard 10% of possible outliers
+MATCH_FILTER_THRESHOLD = 0.9 # Discard 5% of possible outliers
 ORB_NFEATURES = 1000
+MAX_BATCH_SIZE = 1
 
 class ResultsColumns(Enum):
-    TIMESTAMP = 0
-    CONFIDENCE = 1
-    THUMBNAIL = 2
+    FILENAME = 0
+    TIMESTAMP = 1
+    CONFIDENCE = 2
+    THUMBNAIL = 3
 
 match_threshold = 40 # Percent of matching descriptors
+file_list = []
 
 def millisToTime(ms):
     x = ms / 1000
@@ -33,7 +37,7 @@ def open_image_path():
     working_dir = ui.fieldInputImage.text()
     if len(working_dir) == 0 or not os.path.exists(working_dir):
         working_dir = os.getcwd()
-    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Image", working_dir, \
+    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select image", working_dir, \
         "Images (*.png *.jpg);;idgaf (*.*)")
     if not path[0]:
         print("No image selected!")
@@ -45,12 +49,13 @@ def open_video_path():
     working_dir = ui.fieldVideo.text()
     if len(working_dir) == 0 or not os.path.exists(working_dir):
         working_dir = os.getcwd()
-    path = QtWidgets.QFileDialog.getOpenFileName(None, "Select Video", working_dir, \
+    paths = QtWidgets.QFileDialog.getOpenFileNames(None, "Select one or more video files", working_dir, \
         "Videos (*.mp4 *.mkv *.webm);;idgaf (*.*)")
-    if not path[0]:
-        print("No video selected!")
+    if not paths[0]:
+        print("No video(s) selected!")
         return
-    ui.fieldVideo.setText(os.path.normpath(path[0]))
+    normalized_paths = map(lambda item: os.path.normpath(item), paths[0])
+    ui.fieldVideo.setText(';'.join(normalized_paths))
 
 def analyze_image(image):
     parsed_image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
@@ -70,96 +75,103 @@ def analyze_image(image):
     ui.imageInput.setPixmap(aspectFitPixmap)
     
 
-async def scan_video():
-    log('Starting processing...')
-    set_processing_mode(True)
-    path = ui.fieldVideo.text()
-    video = cv2.VideoCapture(path)
-    if not video.isOpened():
-        log("Failed to open {}".format(os.path.basename(path)))
-        return
+async def scan_video(index, semaphore):
+    async with semaphore: 
+        global file_list
+        path = file_list[index]
+        log('Starting processing {}...'.format(os.path.basename(path)))
+        set_processing_mode(True)
+        #path = ui.fieldVideo.text()
+        video = cv2.VideoCapture(path)
+        if not video.isOpened():
+            log("Failed to open {}".format(os.path.basename(path)))
+            return
 
-    # Get frame count
-    total_frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
-    log("Total frames: {}".format(int(total_frames)))
+        ui.labelFileProgress.setText('{} ({}/{})'.format(os.path.basename(path), index + 1, len(file_list)))
 
-    ui.progressBar.setTextVisible(True)
-    ui.progressBar.setValue(0)
-    ui.progressBar.setRange(0, int(total_frames))
+        # Get frame count
+        total_frames = video.get(cv2.CAP_PROP_FRAME_COUNT)
+        log("Total frames: {}".format(int(total_frames)))
 
-    frameWidth = ui.imageVideoFrame.width()
-    frameHeight = ui.imageVideoFrame.height()
+        ui.progressBar.setTextVisible(True)
+        ui.progressBar.setValue(0)
+        ui.progressBar.setRange(0, int(total_frames))
 
-    # Only need to get source image and generate descriptors once
-    source_frame = cv2.imread(ui.fieldInputImage.text(), cv2.IMREAD_GRAYSCALE)
-    
-    log('Generating source image descriptors...')
-    orb = cv2.ORB_create(nfeatures=ORB_NFEATURES)
-    keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, source_frame, None)
-    #matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    FLANN_INDEX_LSH = 6
-    index_params = dict(algorithm = FLANN_INDEX_LSH,
-                    table_number = 6, # 12
-                    key_size = 12,     # 20
-                    multi_probe_level = 1) # 2
-    search_params = dict(checks=50)
+        frameWidth = ui.imageVideoFrame.width()
+        frameHeight = ui.imageVideoFrame.height()
 
-    matcher = cv2.FlannBasedMatcher(index_params, search_params)
+        # Only need to get source image and generate descriptors once
+        source_frame = cv2.imread(ui.fieldInputImage.text(), cv2.IMREAD_GRAYSCALE)
+        
+        log('Generating source image descriptors...')
+        orb = cv2.ORB_create(nfeatures=ORB_NFEATURES)
+        keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, source_frame, None)
+        #matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        FLANN_INDEX_LSH = 6
+        index_params = dict(algorithm = FLANN_INDEX_LSH,
+                        table_number = 12, # 12
+                        key_size = 12,     # 20
+                        multi_probe_level = 2) # 2
+        search_params = dict(checks=100)
 
-    #log('Descriptor count for source frame: {}'.format(len(descriptors)))
+        matcher = cv2.FlannBasedMatcher(index_params, search_params)
 
-    # Clear out results table
-    results_ui.resultsTable.setRowCount(0)
+        #log('Descriptor count for source frame: {}'.format(len(descriptors)))
 
-    log('Beginning match search...')
-    candidate_frames = set()
-    boost_contrast = ui.checkBoostContrast.isChecked()
-    while video.isOpened():
-        result, timestamp, bad_frame, matches = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, \
-            matcher, descriptors, video, boost_contrast)
-        if bad_frame:
-            progress = ui.progressBar.value()
-            ui.progressBar.setValue(progress + 1)
-        elif result:
-            ui.imageVideoFrame.setPixmap(result)
-            progress = ui.progressBar.value()
-            ui.progressBar.setValue(progress + 1)
-            if timestamp > -1:
-                #print(timestamp)
-                converted_timestamp = millisToTime(timestamp)
-                candidate_frames_prev_size = len(candidate_frames)
-                candidate_frames.add(converted_timestamp)
-                # New timestamp, so include in results table
-                if len(candidate_frames) > candidate_frames_prev_size:
-                    results_ui.resultsTable.setRowCount(results_ui.resultsTable.rowCount() + 1)
-                    thumbnail_label = QLabel()
-                    thumbnail_label.setAlignment(QtCore.Qt.AlignCenter)
-                    thumbnail_label.setPixmap(result)
-                    timestamp_item = QTableWidgetItem(converted_timestamp)
-                    timestamp_item.setTextAlignment(QtCore.Qt.AlignCenter)
-                    confidence_item = QTableWidgetItem('{}/{} ({:.1f}%)'.format(matches, len(descriptors), ((matches/len(descriptors)) * 100)))
-                    confidence_item.setTextAlignment(QtCore.Qt.AlignCenter)
-                    results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
-                        ResultsColumns.TIMESTAMP.value, timestamp_item)
-                    results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
-                        ResultsColumns.CONFIDENCE.value, confidence_item)
-                    results_ui.resultsTable.setCellWidget(results_ui.resultsTable.rowCount() - 1, \
-                        ResultsColumns.THUMBNAIL.value, thumbnail_label)
-                    log('Possible match at {}'.format(converted_timestamp))
-        else:
-            set_processing_mode(False)
-            log('Processing complete.')
-            if len(candidate_frames) > 0:
-                candidate_frames = sorted(candidate_frames)
-                log('Found potential matches at: {}'.format(list(candidate_frames)))
-                if not ResultsWindow.isVisible():
-                    ResultsWindow.exec_()
+        log('Beginning match search...')
+        candidate_frames = set()
+        boost_contrast = ui.checkBoostContrast.isChecked()
+        while video.isOpened():
+            result, timestamp, bad_frame, matches = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, \
+                matcher, descriptors, video, boost_contrast)
+            if bad_frame:
+                progress = ui.progressBar.value()
+                ui.progressBar.setValue(progress + 1)
+            elif result:
+                ui.imageVideoFrame.setPixmap(result)
+                progress = ui.progressBar.value()
+                ui.progressBar.setValue(progress + 1)
+                if timestamp > -1:
+                    #print(timestamp)
+                    converted_timestamp = millisToTime(timestamp)
+                    candidate_frames_prev_size = len(candidate_frames)
+                    candidate_frames.add(converted_timestamp)
+                    # New timestamp, so include in results table
+                    if len(candidate_frames) > candidate_frames_prev_size:
+                        results_ui.resultsTable.setRowCount(results_ui.resultsTable.rowCount() + 1)
+                        filename_item = QTableWidgetItem(os.path.basename(path))
+                        filename_item.setTextAlignment(QtCore.Qt.AlignCenter)
+                        thumbnail_label = QLabel()
+                        thumbnail_label.setAlignment(QtCore.Qt.AlignCenter)
+                        thumbnail_label.setPixmap(result)
+                        timestamp_item = QTableWidgetItem(converted_timestamp)
+                        timestamp_item.setTextAlignment(QtCore.Qt.AlignCenter)
+                        confidence_item = QTableWidgetItem('{}/{} ({:.1f}%)'.format(matches, len(descriptors), ((matches/len(descriptors)) * 100)))
+                        confidence_item.setTextAlignment(QtCore.Qt.AlignCenter)
+                        
+                        results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
+                            ResultsColumns.FILENAME.value, filename_item)
+                        results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
+                            ResultsColumns.TIMESTAMP.value, timestamp_item)
+                        results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
+                            ResultsColumns.CONFIDENCE.value, confidence_item)
+                        results_ui.resultsTable.setCellWidget(results_ui.resultsTable.rowCount() - 1, \
+                            ResultsColumns.THUMBNAIL.value, thumbnail_label)
+                        log('Possible match at {}'.format(converted_timestamp))
             else:
-                log('Did not find any matches!')
-            ui.progressBar.setValue(ui.progressBar.maximum())
-            break
+                set_processing_mode(False)
+                log('Processing complete.')
+                if len(candidate_frames) > 0:
+                    candidate_frames = sorted(candidate_frames)
+                    log('Found potential matches at: {}'.format(list(candidate_frames)))
+                    if not ResultsWindow.isVisible():
+                        ResultsWindow.exec_()
+                else:
+                    log('Did not find any matches!')
+                ui.progressBar.setValue(ui.progressBar.maximum())
+                break
 
-def frame_processing_complete(status):
+def processing_complete(status):
     print(status)
  
 def process_frame(scaledWidth, scaledHeight, matcher, source_descriptors, video, boost_contrast):
@@ -179,7 +191,7 @@ def process_frame(scaledWidth, scaledHeight, matcher, source_descriptors, video,
     
     # Increase contrast
     if boost_contrast:
-        contrast = 1.5
+        contrast = 2.0
         brightness = 0
         brightness += int(round(255 * (1 - contrast) / 2))
         frame = cv2.addWeighted(frame, contrast, frame, 0, brightness)
@@ -240,20 +252,29 @@ def start_processing():
         log('Cancelled!')
         set_processing_mode(False)
     else:
-        task = asyncio.ensure_future(scan_video())
-        task.add_done_callback(frame_processing_complete)
+        # Clear out results table
+        results_ui.resultsTable.setRowCount(0)
+
+        global file_list
+        file_list = ui.fieldVideo.text().split(';')
+        for index, item in enumerate(file_list):
+            task = asyncio.ensure_future(scan_video(index, asyncio_semaphore))
+            task.add_done_callback(processing_complete)
 
 def set_processing_mode(processing):
     if processing:
         ui.btnStartScan.setText("Cancel")
     else:
-        ui.btnStartScan.setText("Scan Video")
+        ui.btnStartScan.setText("Scan")
 
     ui.progressBar.setTextVisible(processing)
     ui.btnOpenInputImage.setEnabled(not processing)
     ui.btnOpenVideo.setEnabled(not processing)
     ui.sliderMatchThresh.setEnabled(not processing)
     ui.checkBoostContrast.setEnabled(not processing)
+
+    ui.labelFileProgress.setText('')
+
 
 def match_thresh_changed():
     global match_threshold
@@ -268,6 +289,7 @@ app = QtWidgets.QApplication(sys.argv)
 loop = qasync.QEventLoop(app)
 asyncio.set_event_loop(loop)
 asyncio.events._set_running_loop(loop)
+asyncio_semaphore = asyncio.Semaphore(MAX_BATCH_SIZE)
 
 MainWindow = QtWidgets.QMainWindow()
 ui = Ui_MainWindow()
@@ -278,7 +300,7 @@ ResultsWindow = QtWidgets.QDialog(MainWindow)
 results_ui = Ui_ResultsWindow()
 results_ui.setupUi(ResultsWindow)
 
-results_ui.resultsTable.setHorizontalHeaderLabels(['Timestamp', 'Confidence', 'Thumbnail'])
+results_ui.resultsTable.setHorizontalHeaderLabels(['File', 'Timestamp', 'Confidence', 'Thumbnail'])
 
 # Defaults
 ui.sliderMatchThresh.setSliderPosition(match_threshold)
