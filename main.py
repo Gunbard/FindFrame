@@ -165,7 +165,7 @@ async def scan_video(index, semaphore):
                     candidate_frames = sorted(candidate_frames)
                     log('Found potential matches at: {}'.format(list(candidate_frames)))
                     if not ResultsWindow.isVisible():
-                        ResultsWindow.exec_()
+                        ResultsWindow.show()
                 else:
                     log('Did not find any matches!')
                 ui.progressBar.setValue(ui.progressBar.maximum())
@@ -296,7 +296,7 @@ ui = Ui_MainWindow()
 ui.setupUi(MainWindow)
 MainWindow.setWindowFlags(QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowMinimizeButtonHint)
 
-ResultsWindow = QtWidgets.QDialog(MainWindow)
+ResultsWindow = QtWidgets.QDialog()
 results_ui = Ui_ResultsWindow()
 results_ui.setupUi(ResultsWindow)
 
@@ -312,7 +312,7 @@ ui.btnOpenVideo.clicked.connect(open_video_path)
 ui.btnStartScan.clicked.connect(start_processing)
 ui.sliderMatchThresh.valueChanged.connect(match_thresh_changed)
 
-ui.testbutton.clicked.connect(lambda: ResultsWindow.exec_())
+ui.testbutton.clicked.connect(lambda: ResultsWindow.show())
 
 MainWindow.setWindowTitle(WINDOW_TITLE)
 MainWindow.show()

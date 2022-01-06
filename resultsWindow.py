@@ -13,9 +13,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_ResultsWindow(object):
     def setupUi(self, ResultsWindow):
         ResultsWindow.setObjectName("ResultsWindow")
-        ResultsWindow.setWindowModality(QtCore.Qt.ApplicationModal)
+        ResultsWindow.setWindowModality(QtCore.Qt.NonModal)
         ResultsWindow.resize(512, 360)
-        ResultsWindow.setModal(True)
+        ResultsWindow.setModal(False)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(ResultsWindow)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.resultsTable = QtWidgets.QTableWidget(ResultsWindow)
