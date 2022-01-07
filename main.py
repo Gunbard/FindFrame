@@ -108,12 +108,13 @@ async def scan_video(index, semaphore):
         orb = cv2.ORB_create(nfeatures=ORB_NFEATURES)
         keypoints, descriptors = await loop.run_in_executor(None, orb.detectAndCompute, source_frame, None)
         #matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+
         FLANN_INDEX_LSH = 6
         index_params = dict(algorithm = FLANN_INDEX_LSH,
-                        table_number = 12, # 12
+                        table_number = 6, # 12
                         key_size = 12,     # 20
-                        multi_probe_level = 2) # 2
-        search_params = dict(checks=100)
+                        multi_probe_level = 1) # 2
+        search_params = dict()
 
         matcher = cv2.FlannBasedMatcher(index_params, search_params)
 
@@ -158,6 +159,7 @@ async def scan_video(index, semaphore):
                             ResultsColumns.CONFIDENCE.value, confidence_item)
                         results_ui.resultsTable.setCellWidget(results_ui.resultsTable.rowCount() - 1, \
                             ResultsColumns.THUMBNAIL.value, thumbnail_label)
+                        ResultsWindow.setWindowTitle('{} - Results ({})'.format(APP_TITLE, results_ui.resultsTable.rowCount()))
                         log('Possible match at {}'.format(converted_timestamp))
             else:
                 set_processing_mode(False)
@@ -192,7 +194,7 @@ def process_frame(scaledWidth, scaledHeight, matcher, source_descriptors, video,
     
     # Increase contrast
     if boost_contrast:
-        contrast = 2.0
+        contrast = 4.0
         brightness = 0
         brightness += int(round(255 * (1 - contrast) / 2))
         frame = cv2.addWeighted(frame, contrast, frame, 0, brightness)
@@ -254,6 +256,7 @@ def start_processing():
     else:
         # Clear out results table
         results_ui.resultsTable.setRowCount(0)
+        ResultsWindow.setWindowTitle('{} - Results'.format(APP_TITLE))
 
         global file_list
         file_list = ui.fieldVideo.text().split(';')
@@ -300,7 +303,7 @@ ui = Ui_MainWindow()
 ui.setupUi(MainWindow)
 MainWindow.setWindowFlags(QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowMinimizeButtonHint)
 
-ResultsWindow = QtWidgets.QDialog()
+ResultsWindow = QtWidgets.QDialog(MainWindow)
 results_ui = Ui_ResultsWindow()
 results_ui.setupUi(ResultsWindow)
 
