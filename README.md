@@ -1,5 +1,17 @@
 # FindFrame
 Scans through videos to find matching frames. Uses OpenCV for feature detection and PyQT 5 for UI.
+I originally wrote this to find the exact frame for a Slayers cel I purchased since I did not want to melt my eyes looking for it in a 70+ episode rewatch.
+
+![FindFrame screenshot with results](/readme-img/screenshotV1.png)
+
+### Features
+- Preview detected features/keypoints
+- Adjust match threshold
+- Scan through one video, or an entire series
+- View potential matches while processing
+
+### Download/Pre-built Binaries
+See [Releases] (https://github.com/Gunbard/FindFrame/releases)
 
 ##### Tested with Python 3.8.6/venv on Windows 10
 
@@ -32,10 +44,11 @@ Built exe will be in 'dist' folder
  - Start with a low match threshold and bump it up until it doesn't think every frame is a match. Keep increasing until you stop getting too many false positives.
 
 ### TODO
-- [] Resizable main window
-- [] Match "VU meter"
-- [] Show bigger image with keypoints after clicking thumbnail
-- [] Find out what the hell filetypes cv2.VideoCapture supports
-- [] Expose OpenCV matcher settings
-- [] Process multiple files at a time (need a UI update for this). Increasing MAX_BATCH_SIZE will work, but the UI/progress bars won't be updated correctly.
-- [] Built-in source frame image processing (brightness, contrast, cropping, etc.)
+- [ ] Resizable main window
+- [ ] Match "VU meter"
+- [ ] Show FPS
+- [ ] Show bigger image with keypoints after clicking thumbnail
+- [ ] Find out what the hell filetypes cv2.VideoCapture supports
+- [ ] Expose OpenCV matcher settings
+- [ ] Process multiple files at a time (need a UI update for this). Increasing MAX_BATCH_SIZE will work, but the UI/progress bars won't be updated correctly.
+- [ ] Built-in source frame image processing (brightness, contrast, cropping, etc.)
