@@ -9,7 +9,7 @@ from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QLabel, QTableWidgetItem
 
 APP_TITLE = 'FindFrame'
-VERSION = '0.0.1'
+VERSION = '1.0.0'
 WINDOW_TITLE = "{} {}".format(APP_TITLE, VERSION)
 MATCH_FILTER_THRESHOLD = 0.9 # Discard 5% of possible outliers
 ORB_NFEATURES = 1000
@@ -124,7 +124,8 @@ async def scan_video(index, semaphore):
         candidate_frames = set()
         boost_contrast = ui.checkBoostContrast.isChecked()
         while video.isOpened():
-            result, timestamp, bad_frame, matches = await loop.run_in_executor(None, process_frame, frameWidth, frameHeight, \
+            result, timestamp, bad_frame, matches = await loop.run_in_executor(None, process_frame, \
+                frameWidth, frameHeight, \
                 matcher, descriptors, video, boost_contrast)
             if bad_frame:
                 progress = ui.progressBar.value()
@@ -148,7 +149,8 @@ async def scan_video(index, semaphore):
                         thumbnail_label.setPixmap(result)
                         timestamp_item = QTableWidgetItem(converted_timestamp)
                         timestamp_item.setTextAlignment(QtCore.Qt.AlignCenter)
-                        confidence_item = QTableWidgetItem('{:.1f}% ({}/{})'.format(((matches/len(descriptors)) * 100), matches, len(descriptors)))
+                        confidence_item = QTableWidgetItem('{:.1f}% ({}/{})'.format(((matches/len(descriptors)) * 100), \
+                            matches, len(descriptors)))
                         confidence_item.setTextAlignment(QtCore.Qt.AlignCenter)
                         
                         results_ui.resultsTable.setItem(results_ui.resultsTable.rowCount() - 1, \
@@ -159,7 +161,8 @@ async def scan_video(index, semaphore):
                             ResultsColumns.CONFIDENCE.value, confidence_item)
                         results_ui.resultsTable.setCellWidget(results_ui.resultsTable.rowCount() - 1, \
                             ResultsColumns.THUMBNAIL.value, thumbnail_label)
-                        ResultsWindow.setWindowTitle('{} - Results ({})'.format(APP_TITLE, results_ui.resultsTable.rowCount()))
+                        ResultsWindow.setWindowTitle('{} - Results ({})' \
+                            .format(APP_TITLE, results_ui.resultsTable.rowCount()))
                         log('Possible match at {}'.format(converted_timestamp))
             else:
                 set_processing_mode(False)
