@@ -11,7 +11,7 @@ I originally wrote this to find the exact frame for a Slayers cel I purchased si
 - View potential matches while processing
 
 ### Download/Pre-built Binaries
-See [Releases] (https://github.com/Gunbard/FindFrame/releases)
+See [Releases](https://github.com/Gunbard/FindFrame/releases)
 
 ##### Tested with Python 3.8.6/venv on Windows 10
 
@@ -46,7 +46,7 @@ Built exe will be in 'dist' folder
 ### TODO
 - [ ] Resizable main window
 - [ ] Match "VU meter"
-- [ ] Show FPS
+- [X] Show FPS
 - [ ] Show bigger image with keypoints after clicking thumbnail
 - [ ] Find out what the hell filetypes cv2.VideoCapture supports
 - [ ] Expose OpenCV matcher settings

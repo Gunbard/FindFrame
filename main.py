@@ -34,7 +34,8 @@ class ResultsColumns(Enum):
 
 match_threshold = 40 # Default percent of matching descriptors
 file_list = [] # List of video files to process
-
+last_fps_check = datetime.now()
+fps_count = 0
 
 def millisToTime(ms):
     '''
@@ -182,6 +183,16 @@ async def scan_video(index, semaphore):
                 progress = ui.progressBar.value()
                 ui.progressBar.setValue(progress + 1)
             elif result:
+                # Update FPS label
+                global fps_count, last_fps_check
+                if (datetime.now() - last_fps_check).seconds >= 1:
+                    ui.labelFPS.setText('FPS: {}'.format(fps_count))
+                    fps_count = 0
+                    last_fps_check = datetime.now()
+                else:
+                    fps_count += 1
+
+
                 ui.imageVideoFrame.setPixmap(result)
                 progress = ui.progressBar.value()
                 ui.progressBar.setValue(progress + 1)
@@ -371,10 +382,11 @@ def set_processing_mode(processing):
 
     if not processing:
         ui.labelFileProgress.setText('')
+        ui.labelFPS.setText('')
 
 def match_thresh_changed():
     '''
-    Handler for when the match thresholder slider changes. Updates its label.
+    Handler for when the match threshold slider changes. Updates its label.
     '''
 
     global match_threshold
