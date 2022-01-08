@@ -173,6 +173,9 @@ async def scan_video(index, semaphore):
         #log('Descriptor count for source frame: {}'.format(len(descriptors)))
 
         log('Beginning match search...')
+        ui.progressMatch.setRange(0, len(descriptors))
+        ui.progressMatchPeak.setRange(0, len(descriptors))
+
         candidate_frames = set() # Using a Set to remove duplicate frames (granularity of one second)
         boost_contrast = ui.checkBoostContrast.isChecked()
         while video.isOpened():
@@ -192,6 +195,9 @@ async def scan_video(index, semaphore):
                 else:
                     fps_count += 1
 
+                ui.progressMatch.setValue(matches)
+                if ui.progressMatchPeak.value() < matches:
+                    ui.progressMatchPeak.setValue(matches)
 
                 ui.imageVideoFrame.setPixmap(result)
                 progress = ui.progressBar.value()

@@ -45,7 +45,7 @@ Built exe will be in 'dist' folder
 
 ### TODO
 - [ ] Resizable main window
-- [ ] Match "VU meter"
+- [X] Match "VU meter"
 - [X] Show FPS
 - [ ] Show bigger image with keypoints after clicking thumbnail
 - [ ] Find out what the hell filetypes cv2.VideoCapture supports

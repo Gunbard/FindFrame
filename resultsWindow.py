@@ -14,7 +14,7 @@ class Ui_ResultsWindow(object):
     def setupUi(self, ResultsWindow):
         ResultsWindow.setObjectName("ResultsWindow")
         ResultsWindow.setWindowModality(QtCore.Qt.NonModal)
-        ResultsWindow.resize(512, 360)
+        ResultsWindow.resize(540, 360)
         ResultsWindow.setModal(False)
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(ResultsWindow)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
