@@ -44,7 +44,7 @@ Built exe will be in 'dist' folder
  - Start with a low match threshold and bump it up until it doesn't think every frame is a match. Keep increasing until you stop getting too many false positives.
 
 ### TODO
-- [ ] Resizable main window
+- [X] Resizable main window
 - [X] Match "VU meter"
 - [X] Show FPS
 - [ ] Show bigger image with keypoints after clicking thumbnail

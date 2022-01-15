@@ -12,7 +12,7 @@ from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QLabel, QTableWidgetItem
 
 APP_TITLE = 'FindFrame'
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 WINDOW_TITLE = "{} {}".format(APP_TITLE, VERSION)
 MATCH_FILTER_THRESHOLD = 0.9 # Discard 10% of possible outlier matches
 MULTI_FILE_DELMITER = ';'
@@ -417,7 +417,6 @@ asyncio_semaphore = asyncio.Semaphore(MAX_BATCH_SIZE)
 MainWindow = QtWidgets.QMainWindow()
 ui = Ui_MainWindow()
 ui.setupUi(MainWindow)
-MainWindow.setWindowFlags(QtCore.Qt.WindowCloseButtonHint | QtCore.Qt.WindowMinimizeButtonHint)
 
 ResultsWindow = QtWidgets.QDialog(MainWindow)
 results_ui = Ui_ResultsWindow()
