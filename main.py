@@ -10,6 +10,7 @@ from resultsWindow import Ui_ResultsWindow
 from PyQt5 import QtCore, QtWidgets
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.QtWidgets import QLabel, QTableWidgetItem
+from PyQt5.QtWinExtras import QWinTaskbarButton
 
 APP_TITLE = 'FindFrame'
 VERSION = '1.1.0'
@@ -150,6 +151,8 @@ async def scan_video(index, semaphore):
         ui.progressBar.setTextVisible(True)
         ui.progressBar.setValue(0)
         ui.progressBar.setRange(0, int(total_frames))
+        taskbarProgress.setRange(ui.progressBar.minimum(), ui.progressBar.maximum())
+        taskbarProgress.setValue(ui.progressBar.value())
 
         frameWidth = ui.imageVideoFrame.width()
         frameHeight = ui.imageVideoFrame.height()
@@ -185,6 +188,7 @@ async def scan_video(index, semaphore):
             if bad_frame:
                 progress = ui.progressBar.value()
                 ui.progressBar.setValue(progress + 1)
+                taskbarProgress.setValue(ui.progressBar.value())
             elif result:
                 # Update FPS label
                 global fps_count, last_fps_check
@@ -202,6 +206,7 @@ async def scan_video(index, semaphore):
                 ui.imageVideoFrame.setPixmap(result)
                 progress = ui.progressBar.value()
                 ui.progressBar.setValue(progress + 1)
+                taskbarProgress.setValue(ui.progressBar.value())
                 if timestamp > -1:
                     converted_timestamp = millisToTime(timestamp)
                     candidate_frames_prev_size = len(candidate_frames)
@@ -243,7 +248,10 @@ async def scan_video(index, semaphore):
                 else:
                     log('Did not find any matches!')
                 ui.progressBar.setValue(ui.progressBar.maximum())
+                taskbarProgress.setValue(ui.progressBar.value())
                 break
+
+            MainWindow.setWindowTitle('{} ({})'.format(ui.progressBar.text(), ui.progressBarFiles.text()))
 
 def processing_complete(status):
     print(status)
@@ -376,8 +384,13 @@ def set_processing_mode(processing):
 
     if processing:
         ui.btnStartScan.setText("Cancel")
+        taskbarProgress.resume()
     else:
         ui.btnStartScan.setText("Scan")
+        ui.labelFileProgress.setText('')
+        ui.labelFPS.setText('')
+        taskbarProgress.stop()
+        MainWindow.setWindowTitle(WINDOW_TITLE)
 
     ui.progressBar.setTextVisible(processing)
     ui.progressBarFiles.setTextVisible(processing)
@@ -385,10 +398,6 @@ def set_processing_mode(processing):
     ui.btnOpenVideo.setEnabled(not processing)
     ui.sliderMatchThresh.setEnabled(not processing)
     ui.checkBoostContrast.setEnabled(not processing)
-
-    if not processing:
-        ui.labelFileProgress.setText('')
-        ui.labelFPS.setText('')
 
 def match_thresh_changed():
     '''
@@ -436,6 +445,12 @@ ui.sliderMatchThresh.valueChanged.connect(match_thresh_changed)
 
 MainWindow.setWindowTitle(WINDOW_TITLE)
 MainWindow.show()
+
+taskbarButton = QWinTaskbarButton()
+taskbarProgress = taskbarButton.progress()
+taskbarProgress.setRange(0, 100)
+taskbarProgress.show()
+taskbarButton.setWindow(MainWindow.windowHandle())
 
 with loop:
     loop.run_forever()
