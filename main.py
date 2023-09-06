@@ -33,10 +33,11 @@ class ResultsColumns(Enum):
     CONFIDENCE = 2
     THUMBNAIL = 3
 
-match_threshold = 40 # Default percent of matching descriptors
+match_threshold = 30 # Default percent of matching descriptors
 file_list = [] # List of video files to process
 last_fps_check = datetime.now()
 fps_count = 0
+processed_frame = None
 
 def millisToTime(ms):
     '''
@@ -97,6 +98,32 @@ def open_video_path():
     normalized_paths = map(lambda item: os.path.normpath(item), paths[0])
     ui.fieldVideo.setText(MULTI_FILE_DELMITER.join(normalized_paths))
 
+def open_viewer(event):
+    if not processed_frame:
+        return
+
+    image = QPixmap(processed_frame)
+
+    newLabel = QtWidgets.QLabel()
+    newLabel.setPixmap(image)
+    newLabel.setMinimumSize(1, 1)
+
+    def resized(newSize):
+        newLabel.setPixmap(image.scaled(newSize.size().width(), newSize.size().height(), \
+                                        QtCore.Qt.KeepAspectRatio, \
+                                        QtCore.Qt.SmoothTransformation))
+
+    newDialog = QtWidgets.QDialog()
+    newDialog.setWindowTitle("Image Viewer")
+    newDialog.resizeEvent = resized
+    newDialog.setMaximumSize(app.primaryScreen().availableSize().width(), \
+                            app.primaryScreen().availableSize().height())
+    dialogLayout = QtWidgets.QGridLayout()
+    dialogLayout.setContentsMargins(0, 0, 0, 0)
+    dialogLayout.addWidget(newLabel, 0, 0, QtCore.Qt.AlignCenter)
+    newDialog.setLayout(dialogLayout)
+    newDialog.exec()
+
 def analyze_image(image):
     '''
     Generates a thumbnail with detected keypoints drawn on the source image
@@ -104,21 +131,22 @@ def analyze_image(image):
     Parameters:
     image (string): Path to an image file
     '''
-
+    global processed_frame
     parsed_image = cv2.imread(image, cv2.IMREAD_GRAYSCALE)
     
     orb = cv2.ORB_create(nfeatures=ORB_NFEATURES)
     keypoints, descriptors = orb.detectAndCompute(parsed_image, None)
 
-    img = cv2.drawKeypoints(parsed_image, keypoints, None, color=(0,255,255), flags=0)
+    img = cv2.drawKeypoints(parsed_image, keypoints, None, color=(255,0,0), flags=0)
 
     height, width, channel = img.shape
     bytesPerLine = 3 * width
     qImg = QImage(img.data, width, height, bytesPerLine, QImage.Format_RGB888)
+    processed_frame = qImg
     aspectFitPixmap = QPixmap(qImg).scaled(ui.imageInput.width(), \
                                         ui.imageInput.height(), \
                                         QtCore.Qt.KeepAspectRatio, \
-                                        QtCore.Qt.FastTransformation)
+                                        QtCore.Qt.SmoothTransformation)
     ui.imageInput.setPixmap(aspectFitPixmap)
 
 async def scan_video(index, semaphore):
@@ -442,6 +470,7 @@ ui.btnOpenVideo.clicked.connect(open_video_path)
 ui.btnStartScan.clicked.connect(start_processing)
 ui.btnResults.clicked.connect(lambda: ResultsWindow.show())
 ui.sliderMatchThresh.valueChanged.connect(match_thresh_changed)
+ui.imageInput.mousePressEvent = open_viewer
 
 MainWindow.setWindowTitle(WINDOW_TITLE)
 MainWindow.show()

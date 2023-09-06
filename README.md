@@ -4,6 +4,8 @@ I originally wrote this to find the exact frame for a Slayers cel I purchased si
 
 ![FindFrame screenshot with results](/readme-img/screenshotV1.png)
 
+![FindFrame screenshot1.1 with results](/readme-img/screenshotV1.1.png)
+
 ### Features
 - Preview detected features/keypoints
 - Adjust match threshold
@@ -22,8 +24,7 @@ pip install -r requirements.txt
 
 ### (Re)compiling the UI
 ```sh
-pyuic5 findFrameWindow.ui -o mainWindow.py
-pyuic5 results.ui -o resultsWindow.py
+pyuic5 findFrameMain.ui -o mainWindow.py; pyuic5 results.ui -o resultsWindow.py
 ```
 
 ### Running
@@ -40,14 +41,14 @@ pyinstaller --onefile --noconsole main.py
 Built exe will be in 'dist' folder
 
 ### Scan tips
- - Increase source frame/image contrast to help with feature detection. Crop out stuff that might not be in the video. The detected features will be visible in the source frame thumbnail. The more features, the more the app has the search against. Also, making sure the aspect ratio is similar will help.
+ - Increase source frame/image contrast to help with feature detection. Crop out stuff that might not be in the video. The detected features will be visible in the source frame thumbnail. Click to enlarge. The more features, the more the app has to search against. Also, making sure the aspect ratio is similar will help.
  - Start with a low match threshold and bump it up until it doesn't think every frame is a match. Keep increasing until you stop getting too many false positives.
 
 ### TODO
 - [X] Resizable main window
 - [X] Match "VU meter"
 - [X] Show FPS
-- [ ] Show bigger image with keypoints after clicking thumbnail
+- [X] Show bigger image with keypoints after clicking thumbnail
 - [ ] Find out what the hell filetypes cv2.VideoCapture supports
 - [ ] Expose OpenCV matcher settings
 - [ ] Process multiple files at a time (need a UI update for this). Increasing MAX_BATCH_SIZE will work, but the UI/progress bars won't be updated correctly.
